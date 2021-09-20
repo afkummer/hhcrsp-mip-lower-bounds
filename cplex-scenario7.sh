@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo "--------------------------------------"
-echo "--- MIP-LB Experiment - Scenario 5 ---"
+echo "--- MIP-LB Experiment - Scenario 7 ---"
 echo "--------------------------------------"
 
 if [ $# -ne 2 ]; then
@@ -11,7 +11,7 @@ fi
 
 INST=$1
 TILIM=$2
-WDIR="$(mktemp -d -p . sce5.XXXXXXXX)"
+WDIR="$(mktemp -d -p . sce7.XXXXXXXX)"
 GEN=/home/alberto/work/doct-ufrgs-thesis/mankowska2014/build/exactMip
 export SKIP_OPT=1
 export ADDITINAL_CUTS=1
