@@ -26,6 +26,9 @@ MipModel::MipModel(const Instance &inst): m_inst(inst) {
    m_cplex = IloCplex(m_model);
    m_expr = IloExpr(m_env);
    m_model.setName("HHCRSP");
+
+   m_cplex.setParam(IloCplex::BoolParam::MemoryEmphasis, IloTrue);
+   cout << "Forcibly setting CPLEX memory emphasis flag to ON." << endl;
 }
 
 MipModel::~MipModel() {
@@ -572,6 +575,68 @@ void MipModel::createAllConstraints() {
             }
          }
       }
+   }
+
+   if (auto rcuts = getenv("RCUTS"); rcuts && stoi(rcuts) == 1) {
+      cout << "Enabling additional/redundant cuts." << endl;
+
+      for (int v1 = 0; v1 < m_inst.numVehicles(); ++v1) {
+         for (int v2 = 0; v2 < m_inst.numVehicles(); ++v2) {
+            if (v1 == v2)
+               continue;
+            for (int i = 1; i < m_inst.numNodes() - 1; ++i) {
+               for (int s : m_inst.nodeSkills(i)) {
+                  for (int j = 0; j < m_inst.numNodes() - 1; ++j) {
+                     auto x1 = m_x[j][i][v1][s];
+                     auto x2 = m_x[j][i][v2][s];
+                     if (x1.getImpl())
+                        m_expr += x1;
+                     if (x2.getImpl())
+                        m_expr += x2;
+                  }
+                  IloConstraint c = m_expr <= 1;
+                  snprintf(buf, sizeof buf, "redundant_cover#%d#%d#%d#%d", v1, v2, i, s);
+                  c.setName(buf);
+                  m_model.add(c);
+
+                  m_model.add(c);
+                  m_expr.clear();
+               }
+            }
+         }
+      }
+      cout << "Additional cover cuts added." << endl;
+
+      for (int i = 1; i < m_inst.numNodes() - 1; ++i) {
+         for (int j = 1; j < m_inst.numNodes() - 1; ++j) {
+            for (int sj : m_inst.nodeSkills(j)) {
+               for (int v = 0; v < m_inst.numVehicles(); ++v) {
+                  if (auto &x1 = m_x[i][j][v][sj]; x1.getImpl()) {
+                     m_expr += x1;
+
+                     for (int h = 0; h < m_inst.numNodes() - 1; ++h) {
+                        for (int sh : m_inst.nodeSkills(h)) {
+                           if (auto &x2 = m_x[j][h][v][sh]; h != i && x2.getImpl()) {
+                              m_expr -= x2;
+                           }
+                        }
+                     }
+
+                     IloConstraint c = m_expr <= 0;
+                     snprintf(buf, sizeof buf, "frac_cycle#%d#%d#%d#%d", i, j, v, sj);
+                     c.setName(buf);
+                     m_model.add(c);
+
+                     m_expr.clear();
+                  }
+               }
+            }
+         }
+      }
+      cout << "Fractional cycle elimination constraints added." << endl;
+
+   } else {
+      cout << "Additional/redundant cuts DISABLED." << endl;
    }
 }
 
